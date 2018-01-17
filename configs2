@@ -1,0 +1,10 @@
+[directories]
+root=/a/_proj/
+
+[projects]
+joblogger=/a/_proj/joblogger/
+logger=/a/_proj/supermanager/srcs/logger/
+
+[lastproject]
+name=joblogger
+
