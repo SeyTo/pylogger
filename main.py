@@ -7,7 +7,7 @@ import subprocess
 CONFIG_FILE = 'configs'
 NOTIFIER_FILE = 'notifier.sh'
 TASK_DURATION = 30
-
+DAEMON_SH = 'daemon.sh'
 
 def notify(header, message, sound):
     # os.execl(NOTIFIER_FILE, header, message, sound)
@@ -32,6 +32,12 @@ def get_current_project():
         return None
 
 
+def start_daemon(hrs, min):
+    # subprocess.call(['sudo', 'atd'])
+    time = '{0:0>2}:{1:0>2}'.format(hrs,min)
+    subprocess.call(['at', time, '-f', DAEMON_SH])
+
+
 def set_current_project(project_name):
     CURRENT_PROJECT = project_name 
     parser = configparser.RawConfigParser()
@@ -47,13 +53,19 @@ def parse_configs(header, key):
     return parser.get(header, key)
 
 
+def log(head, log):
+    pass
+
+
 class SetTimeout(argparse.Action):
 
-    def __init__(self, option_strings, dest, nargs=None, const=None, default=None, type=None, choices=None, required=False, help=None, metavar=None):
-        super().__init__(option_strings, dest, nargs, const, default, type, choices, required, help, metavar)
-
     def __call__(self, parser, namespace, values, option_string=None):
-        print(values)
+        import datetime
+        now = datetime.datetime.now()
+        val = int(values[0]) + now.minute
+        hours = int(val / 60) + now.hour
+        min = (val % 60)
+        start_daemon(hours , min)
 
 
 class DoProject(argparse.Action):
@@ -99,25 +111,30 @@ class DoProject(argparse.Action):
                 a = int(chosen)
                 if a > len(projects) or a < 1:
                     raise ValueError
-                set_current_project(projects[int(chosen) - 1][0])
+                set_cuqrrent_project(projects[int(chosen) - 1][0])
             except ValueError:
                 print('Cant understand what you mean!')
 
     def resume(self):
         # resumes the current project if it has been stopped or paused
         # todo: resume the timer
+        # start atd
+        # put at using timeout to call this script wth timeout call
         # todo: log project is resuming
         notify('Resuming this project', 'at this time', 'start')
+        # log 
         print('resume')
 
     def pause(self):
         # pauses the current project timer if it had been resumed
         notify('Pausing this project', 'at this time', 'stop')
+        # log 
         print('pause')
 
     def stop(self):
         # stops the current project timer if it had been resumed
         notify('Stopping this project', 'at this time', 'stop')
+        # log 
         print('stopped')
 
 
@@ -152,8 +169,8 @@ LOG_LEVEL = 0
 
 parser = argparse.ArgumentParser(prog='Logger', description='Log your activities')
 # options to show, resume, pause, stop the current project
-parser.add_argument('-c', choices=['v', 'r', 'p', 's'], action=DoProject, help='v - show/select projects\n r - resume project\n p - pause project(toilet break)\n s - stop project (done for the day, doing another project)')
-parser.add_argument('-t', nargs=1, action=SetTimeout, type=int, help='set timout for the project.')
+parser.add_argument('-c', choices=['v', 'r', 'p', 's'], action=DoProject, help='v - show/select projects\n r - resume project\n p - pause project\n s - stop project (done for the day, doing another project)')
+parser.add_argument('-t', nargs=1, action=SetTimeout, help='set timout for the project.')
 parser.add_argument('-l', nargs=1, action=SetLogLevel, help='set log level.')
 parser.add_argument('LOG', nargs='*', action=LogForProject, help='log some information on the project')
 parser.parse_args();

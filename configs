@@ -6,5 +6,6 @@ joblogger = /a/_proj/joblogger/
 logger = /a/_proj/supermanager/srcs/logger/
 
 [lastproject]
-name = logger
+name = joblogger
+timeout = 60
 
