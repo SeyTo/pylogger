@@ -2,6 +2,7 @@ import argparse
 import configparser
 import os
 import subprocess
+import datetime
 
 
 CONFIG_FILE = 'configs'
@@ -24,26 +25,27 @@ def get_current_project():
     parser = configparser.ConfigParser()
     parser.read(CONFIG_FILE)
     name = parser.get('lastproject', 'name')
-    print (name)
     try:
-        return parser.get('projects', name)
+        return { 'name': name, 'loc': parser.get('projects', name) }
     except configparser.InterpolationError:
         print('No project {0} found. Please select a new project.'.format(name))
         return None
 
 
 def start_daemon(hrs, min):
+    # user should start atd
     # subprocess.call(['sudo', 'atd'])
     time = '{0:0>2}:{1:0>2}'.format(hrs,min)
     subprocess.call(['at', time, '-f', DAEMON_SH])
 
 
-def set_current_project(project_name):
-    CURRENT_PROJECT = project_name 
+def set_current_project(project):
+
+    CURRENT_PROJECT = project
     parser = configparser.RawConfigParser()
     parser.read(CONFIG_FILE)
     with open(CONFIG_FILE, 'w') as config_file:
-        parser.set('lastproject', 'name', project_name)
+        parser.set('lastproject', 'name', project[0])
         parser.write(config_file)
 
 
@@ -57,10 +59,22 @@ def log(head, log):
     pass
 
 
+def checkProcessRunning(program):
+    import psutil
+    return program in (p.name() for p in psutil.process_iter())
+
+
+def printCurrentTime():
+    now = datetime.datetime.now()
+    return "{0}:{1}".format(now.hour, now.minute)
+
+
 class SetTimeout(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
-        import datetime
+        if not checkProcessRunning('atd'):
+            print('atd not running. Please sudo run atd program.')
+            return
         now = datetime.datetime.now()
         val = int(values[0]) + now.minute
         hours = int(val / 60) + now.hour
@@ -91,19 +105,18 @@ class DoProject(argparse.Action):
 
     def show(self, values):
         # shows all the projects and the current project 
-        global CURRENT_PROJECT
         print( '{0:15}     {1}'.format('Name', 'Location'))
         print( 55 * '-')
         projects = get_all_projects()
         for proj in projects:
             print("{0:15} --> {1} ".format(proj[0], proj[1]))
         print( 55 * '-')
-        print("Current Project: {0} ".format(CURRENT_PROJECT))
+        print("Current Project: {0} ".format(CURRENT_PROJECT['name']))
         chosen = input("Choose Project: ")
         found = False
         for proj in projects:
             if chosen == proj[0]:
-                set_current_project(chosen)
+                set_current_project(proj)
                 print ('Current Project Selected is ' + chosen)
                 found = True
         if not found:
@@ -111,9 +124,10 @@ class DoProject(argparse.Action):
                 a = int(chosen)
                 if a > len(projects) or a < 1:
                     raise ValueError
-                set_cuqrrent_project(projects[int(chosen) - 1][0])
+                else:
+                    set_current_project(projects[int(chosen) - 1])
             except ValueError:
-                print('Cant understand what you mean!')
+                print('Cant understand what you mean! Nothing will change.')
 
     def resume(self):
         # resumes the current project if it has been stopped or paused
@@ -121,19 +135,20 @@ class DoProject(argparse.Action):
         # start atd
         # put at using timeout to call this script wth timeout call
         # todo: log project is resuming
-        notify('Resuming this project', 'at this time', 'start')
+        notify('Resuming {0} project'.format(CURRENT_PROJECT['name']), printCurrentTime(), 'resume')
         # log 
         print('resume')
 
     def pause(self):
         # pauses the current project timer if it had been resumed
-        notify('Pausing this project', 'at this time', 'stop')
+        notify('Pausing {0} project'.format(CURRENT_PROJECT['name']), printCurrentTime(), 'pause')
         # log 
         print('pause')
+        # cancel daemon -> get remaining time -> wait 
 
     def stop(self):
         # stops the current project timer if it had been resumed
-        notify('Stopping this project', 'at this time', 'stop')
+        notify('Stopping {0}'.format(CURRENT_PROJECT['name']), printCurrentTime(), 'stopping')
         # log 
         print('stopped')
 
@@ -161,7 +176,7 @@ class SetLogLevel(argparse.Action):
 # select a current project or none
 CURRENT_PROJECT = get_current_project()
 if not CURRENT_PROJECT:
-    CURRENT_PROJECT = 'No Current Project Selected'
+    CURRENT_PROJECT['name'] = 'No Current Project Selected'
 
 # 0=stopped, 1=started, 2=paused, 3=timeout
 CURRENT_STATE = 0
