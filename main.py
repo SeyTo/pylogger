@@ -22,6 +22,7 @@ def get_all_projects():
 
 
 def get_current_project():
+    """Get the current project by its name and location"""
     parser = configparser.ConfigParser()
     parser.read(CONFIG_FILE)
     name = parser.get('lastproject', 'name')
@@ -33,20 +34,34 @@ def get_current_project():
 
 
 def start_daemon(hrs, min):
+    """Start an at queue at the given hour and minute.
+
+    Keyword arguments:
+    hrs -- hours (no default)
+    min -- minute (no default)
+    """
     # user should start atd
     # subprocess.call(['sudo', 'atd'])
     time = '{0:0>2}:{1:0>2}'.format(hrs,min)
     subprocess.call(['at', time, '-f', DAEMON_SH])
 
 
-def set_current_project(project):
-
-    CURRENT_PROJECT = project
+def set_config(section, key, value):
+    """Set new config key value in configuration file."""
     parser = configparser.RawConfigParser()
     parser.read(CONFIG_FILE)
     with open(CONFIG_FILE, 'w') as config_file:
-        parser.set('lastproject', 'name', project[0])
+        parser.set(section, key, value)
         parser.write(config_file)
+
+
+def set_current_project(project):
+    CURRENT_PROJECT = project
+    set_config('lastproject', 'name', project[0])
+
+
+def set_timout_min(min):
+    set_config('lastproject', 'timeout', min)
 
 
 def parse_configs(header, key):
@@ -70,16 +85,19 @@ def printCurrentTime():
 
 
 class SetTimeout(argparse.Action):
+"""Sets a new timeout in minutes. When certain minutes/hours are completed then 
+you are notified about the timeout and the project pauses until you resume.
+Currently timeout is only set in minutes.
+"""
 
     def __call__(self, parser, namespace, values, option_string=None):
-        if not checkProcessRunning('atd'):
-            print('atd not running. Please sudo run atd program.')
-            return
+        parser = configparser.ConfigParser()
+        parser.write()
         now = datetime.datetime.now()
         val = int(values[0]) + now.minute
         hours = int(val / 60) + now.hour
         min = (val % 60)
-        start_daemon(hours , min)
+        print()
 
 
 class DoProject(argparse.Action):
@@ -136,6 +154,7 @@ class DoProject(argparse.Action):
         # put at using timeout to call this script wth timeout call
         # todo: log project is resuming
         notify('Resuming {0} project'.format(CURRENT_PROJECT['name']), printCurrentTime(), 'resume')
+        # start_daemon()
         # log 
         print('resume')
 
@@ -181,6 +200,9 @@ if not CURRENT_PROJECT:
 # 0=stopped, 1=started, 2=paused, 3=timeout
 CURRENT_STATE = 0
 LOG_LEVEL = 0
+
+if not checkProcessRunning('atd'):
+    print('atd not running. Please sudo run atd program.')
 
 parser = argparse.ArgumentParser(prog='Logger', description='Log your activities')
 # options to show, resume, pause, stop the current project
